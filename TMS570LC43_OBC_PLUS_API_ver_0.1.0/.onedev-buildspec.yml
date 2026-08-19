@@ -1,0 +1,31 @@
+version: 18
+stepTemplates:
+- name: g
+  steps:
+  - !PushRepository
+    name: g
+    remoteUrl: https://github.com/Liscotech/Liscotech-OBC100-c_ccs-OBC100_TMS570
+    passwordSecret: access-token
+    withLfs: false
+    force: true
+    condition: ALWAYS
+jobs:
+- name: p
+  steps:
+  - !PushRepository
+    name: Liscotech
+    remoteUrl: https://github.com/Liscotech/Liscotech-OBC100-c_ccs-OBC100_TMS570
+    userName: Liscotech
+    passwordSecret: access-token
+    withLfs: false
+    force: true
+    condition: ALWAYS
+  triggers:
+  - !TagCreateTrigger {}
+  - !BranchUpdateTrigger {}
+  retryCondition: never
+  maxRetries: 3
+  retryDelay: 30
+  cpuRequirement: 1024
+  memoryRequirement: 512
+  timeout: 3600

@@ -1,0 +1,211 @@
+/*
+ * global.h
+ *
+ *  Created on: 2019¦~6¤ë5¤é
+ *      Author: kusoyao
+ */
+
+#ifndef INC_GLOBAL_H_
+#define INC_GLOBAL_H_
+
+#include "FreeRTOS.h"
+#include "os_queue.h"
+#include "os_semphr.h"
+
+#include <stdarg.h>
+#include <string.h>
+#include "HL_sys_common.h"
+#include "ff_time.h"
+
+
+/* Set the privilege level to user mode if xRunningPrivileged is false.  */
+/* TCJ: check must be against zero, see prvRaisePrivilege in portASM.asm */
+#define portRESET_PRIVILEGE( xRunningPrivileged ) if( xRunningPrivileged == 0 ) portSWITCH_TO_USER_MODE()
+
+/*----------------------------------------------------------------------------*/
+#pragma SWI_ALIAS(prvRaisePrivilege, 1);
+extern BaseType_t prvRaisePrivilege( void );
+
+#define CORE_CACHE_LINE_SIZE_IN_BYTES (32u)
+#define CORE_CACHE_LINE_MASK (~(CORE_CACHE_LINE_SIZE_IN_BYTES - 1))
+
+#define  __error__(__FILE__, __LINE__) { printk( "ASSERT: " __FILE__ " at line %d\n", __LINE__);  taskDISABLE_INTERRUPTS(); for( ;; ); }
+
+//OBC HAVE NO SDRAM
+#define SDRAM_ADDR 0x80000000
+#define SDRAM_SIZE 0x800000
+
+#define SRAM1_ADDR 0x60000000
+#define SRAM1_SIZE 0x200000
+#define __SRAM1_SECTION__ __attribute__ ((aligned(32))) __attribute__ ((section(".sram1_section")))
+#define SRAM2_ADDR 0x64000000
+#define SRAM2_SIZE 0x200000
+#define __SRAM2_SECTION__ __attribute__ ((aligned(32))) __attribute__ ((section(".sram2_section")))
+#define SRAM3_ADDR 0x68000000
+#define SRAM3_SIZE 0x200000
+#define __SRAM3_SECTION__ __attribute__ ((aligned(32))) __attribute__ ((section(".sram3_section")))
+
+/////////////////////////////////////////
+//Project Config
+#define SOFTWARE_VERSION 2
+#define STR_SOFTWARE_VERSION "2"
+#define SOFTWARE_BUILD 6
+#define STR_SOFTWARE_BUILD "6"
+#define DEFAULT_DEBUG 0
+//////////////////////////////////////////
+
+#define SEGMENTSIZE 59392//(8192*2)//59392
+#define IMAGE_LINE_COUNT 1200
+#define IMAGE_LINE_WIDTH 1920
+#define IMAGE_LINE_SIZE (IMAGE_LINE_WIDTH * 10 / 8)
+#define IMAGE_SIZE_8B (IMAGE_LINE_WIDTH * IMAGE_LINE_COUNT)
+#define IMAGE_SIZE_10B (IMAGE_LINE_SIZE * IMAGE_LINE_COUNT)
+
+#define IMAGE_BUFFER_SIZE (IMAGE_SIZE_10B)
+
+#define SPI_BUFFER_SIZE (IMAGE_BUFFER_LINE_SIZE*2)
+#define SPI_BUFFER_SIZE_ALLOC ((SPI_BUFFER_SIZE + CORE_CACHE_LINE_SIZE_IN_BYTES - 1) & CORE_CACHE_LINE_MASK)
+
+#define JPG_DMA_BUFFER_SIZE (1024*383)
+#define JPG_BUFFER_SIZE (1024*1024)
+#define THUMBNAIL_BUFFER_SIZE (192*120*3)
+
+
+#define add_image_id_data 1
+//extern volatile uint16_t spi_rx_buffer[IMAGE_LINE_COUNT / 2][IMAGE_LINE_WIDTH / 2]; //note: 16bit unit
+// memory is very limited, they all share the same space
+//typedef union {
+//    //uint8_t image_buffer_10b[IMAGE_LINE_COUNT][IMAGE_LINE_SIZE]; //note: 8bit unit
+//    //uint8_t image_buffer_10b[2][2]; //note: 8bit unit
+//	//uint8_t image_buffer_8b[IMAGE_LINE_COUNT][IMAGE_LINE_WIDTH]; //note: 8bit unit
+//    uint8_t image_buffer_8b[2][2]; //note: 8bit unit
+//} image_buffer_t;
+//extern const image_buffer_t image_buffers;
+//extern const uint8_t image_buffer_jpeg_dma[JPG_DMA_BUFFER_SIZE]; //note: 8bit unit
+//extern const uint8_t image_buffer_jpeg[JPG_BUFFER_SIZE]; //note: 8bit unit, may overwrite
+//extern const uint8_t image_buffer_thumbnail[THUMBNAIL_BUFFER_SIZE];
+//extern const uint8_t image_buffer_thumbnail_jpeg[JPG_BUFFER_SIZE/5];
+extern uint8_t spi_rx_buffer[65280];
+extern uint8_t spi_tx_buffer[65280];
+extern uint8_t imageinfo_buffer[17] __SRAM2_SECTION__;
+//extern const uint8_t image_buffer_test[200000];
+extern const FF_TimeStruct_t TimeBuff[1];
+extern QueueHandle_t qin;
+extern uint8_t SCI1RXBUF;
+extern uint8_t SCI3RXBUF;
+extern uint8_t SCI4RXBUF;
+extern uint8_t api_tx_buffer[512]   __SRAM1_SECTION__;
+extern uint8_t api_rx_buffer[512]   __SRAM1_SECTION__;
+extern uint8_t api_tx_buffer2[512]   __SRAM1_SECTION__;
+extern uint8_t api_rx_buffer2[512]   __SRAM1_SECTION__;
+extern struct scidma_handle *sciconsole;
+extern struct scidma_handle *scidata;
+
+extern volatile uint8_t testbuf[512];
+
+
+/* Enabling Liscotech TK2 */
+#if 0
+    //#define SF2_UART sciREG3
+    //#define STARTRACKER_PORT sciREG3  // originally sci3
+#endif
+
+#define CONSOLE_BUFFER_SIZE 1024
+
+extern uint8_t sci_debug_buffer[CONSOLE_BUFFER_SIZE];
+
+int printk(const char *format, ...);
+int printk_str(const char *string, int len);
+int printk_ni(const char *format, ...);
+/* mode.
+ * 0: debug, print DMA time
+ * 1: data 10b
+ * 2: data 8b
+ * 3: pending
+ * other: debug, print nothing
+ * */
+extern volatile int gmode;
+/* output mode.
+ * 0: debug, print FPS
+ * 1: uart - data 10b
+ * 2: uart - data 8b
+ * 3: uart - jpeg
+ * 4: no output measure speed - jpeg
+ * */
+extern volatile int goutmode;
+extern volatile int gframe_size;
+extern volatile int gframe_id;
+extern SemaphoreHandle_t sem_image_ready;
+extern SemaphoreHandle_t sem_image_processed;
+
+#pragma pack(1)
+typedef union{
+    unsigned int flag;
+    struct {
+        unsigned char ADC1_CH0_VOL   : 1;
+        unsigned char ADC1_CH1_VOL   : 1;
+        unsigned char ADC1_CH2_VOL   : 1;
+        unsigned char ADC1_CH3_VOL   : 1;
+        unsigned char ADC1_CH4_VOL   : 1;
+        unsigned char ADC1_CH5_VOL   : 1;
+        unsigned char ADC1_CH6_VOL   : 1;
+        unsigned char ADC1_CH7_VOL   : 1;
+
+        unsigned char ADC1_CH8_VOL   : 1;
+        unsigned char ADC1_CH9_VOL   : 1;
+        unsigned char ADC1_CH10_VOL  : 1;
+        unsigned char ADC1_CH11_VOL  : 1;
+        unsigned char ADC1_CH31_VOL  : 1;
+        unsigned char ADC2_CH0_VOL   : 1;
+        unsigned char ADC2_CH1_VOL   : 1;
+        unsigned char ADC2_CH2_VOL   : 1;
+
+        unsigned char ADC2_CH3_VOL   : 1;
+        unsigned char ADC2_CH4_VOL   : 1;
+        unsigned char ADC2_CH5_VOL   : 1;
+        unsigned char ADC2_CH6_VOL   : 1;
+        unsigned char ADC2_CH7_VOL   : 1;
+        unsigned char ADC2_CH16_VOL  : 1;
+        unsigned char ADC2_CH17_VOL  : 1;
+        unsigned char ADC2_CH18_VOL  : 1;
+
+        unsigned char ADC2_CH30_VOL  : 1;
+        unsigned char ADC2_CH31_VOL  : 1;
+    };
+}HealthFlagFormat;
+
+#pragma pack(1)
+typedef struct {
+    uint8_t captureMode;
+    uint8_t powerStatus;
+    uint8_t esmStatus;
+    uint8_t noTimeError;
+    HealthFlagFormat healthStatus;
+    uint8_t errorTimes;
+    uint8_t commandTimes;
+    uint8_t commandFailedTimes;
+    uint8_t commandSuccessTimes;
+    uint32_t lastCommandExecuteTime;
+    uint32_t lastCommandTime;
+    uint32_t busy;
+}HouseKeepingDataFormat;
+
+extern volatile HouseKeepingDataFormat houseKeepingData;
+
+/* enable or disable receiving change OBC mode from SF2*/
+extern volatile uint8_t change_OBC_mode_from_SF2_switch;
+int global_init();
+
+/* below is for radiation test */
+extern volatile uint8_t radiation_test;
+
+extern volatile uint8_t adc_enable;
+extern uint8_t transfer_time;
+extern uint8_t save_photo_number;
+extern uint8_t save_photo_number_mode3_Photo2;
+extern uint8_t save_photo_number_mode3_Photo3;
+extern uint32_t u32_test_read;
+extern uint32_t jpeg_state_flag;
+//#define TK2_OBC
+#define OBC_100
+#endif /* INC_GLOBAL_H_ */
